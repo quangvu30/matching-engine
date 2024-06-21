@@ -1,6 +1,8 @@
 package utils
 
-import "github.com/gammazero/deque"
+import (
+	"github.com/gammazero/deque"
+)
 
 func InsertAsc(array *deque.Deque[float64], number float64) {
 	index := BinarySearchAsc(*array, number)

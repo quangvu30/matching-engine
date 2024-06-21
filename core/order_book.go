@@ -17,16 +17,14 @@ const (
 )
 
 type OrderBook struct {
-	pipe chan []types.PipeMsg
 	Buy  map[float64]*treemap.Map
 	BP   *deque.Deque[float64]
 	Sell map[float64]*treemap.Map
 	SP   *deque.Deque[float64]
 }
 
-func NewOrderBook(pipe chan []types.PipeMsg) *OrderBook {
+func NewOrderBook() *OrderBook {
 	return &OrderBook{
-		pipe: pipe,
 		SP:   deque.New[float64](),
 		BP:   deque.New[float64](),
 		Buy:  make(map[float64]*treemap.Map),
@@ -34,7 +32,8 @@ func NewOrderBook(pipe chan []types.PipeMsg) *OrderBook {
 	}
 }
 
-func (ob *OrderBook) AddOrder(order types.Order) {
+func (ob *OrderBook) AddOrder(order types.Order) []types.PipeMsg {
+	msgs := []types.PipeMsg{}
 	if order.Side == B {
 		// kiem tra gia mua da ton tai chua
 		tree, exist := ob.Buy[order.Price]
@@ -45,13 +44,15 @@ func (ob *OrderBook) AddOrder(order types.Order) {
 			// them gia mua moi
 			ob.Buy[order.Price] = treemap.NewWith(utils.UInt64Comparator)
 			ob.Buy[order.Price].Put(order.ID, order.Qty)
+			mutils.InsertAsc(ob.BP, order.Price)
 
 			// tim gia ban nho nhat
 			if ob.SP.Len() == 0 {
-				return
+				return nil
 			}
 			pSellMin := ob.SP.Front()
 			for order.Price >= pSellMin {
+
 				treeBuy := ob.Buy[order.Price]
 				ordBuyId, _ := treeBuy.Min()
 				// lay ra tree cua gia ban nho nhat
@@ -73,19 +74,17 @@ func (ob *OrderBook) AddOrder(order types.Order) {
 					}
 
 					// tao message
-					msgs := []types.PipeMsg{
-						{
-							ID:     ordSellId.(uint64),
-							Filled: qtySellF,
-							Remain: 0,
-						},
-						{
-							ID:     order.ID,
-							Filled: qtySellF,
-							Remain: order.Qty,
-						},
-					}
-					ob.pipe <- msgs
+					msgs = append(msgs, types.PipeMsg{
+						ID:     ordSellId.(uint64),
+						Filled: qtySellF,
+						Remain: 0,
+					},
+					)
+					msgs = append(msgs, types.PipeMsg{
+						ID:     order.ID,
+						Filled: qtySellF,
+						Remain: order.Qty,
+					})
 
 					// set lai pSellMin
 					pSellMin = ob.SP.Front()
@@ -108,7 +107,7 @@ func (ob *OrderBook) AddOrder(order types.Order) {
 					}
 
 					// tao message
-					msgs := []types.PipeMsg{
+					return []types.PipeMsg{
 						{
 							ID:     ordSellId.(uint64),
 							Filled: qtySellF,
@@ -120,8 +119,6 @@ func (ob *OrderBook) AddOrder(order types.Order) {
 							Remain: 0,
 						},
 					}
-					ob.pipe <- msgs
-					return
 				} else {
 					// cap nhat so luong ban
 					treeSell.Put(ordSellId, qtySellF-order.Qty)
@@ -134,7 +131,7 @@ func (ob *OrderBook) AddOrder(order types.Order) {
 					}
 
 					// tao message
-					msgs := []types.PipeMsg{
+					return []types.PipeMsg{
 						{
 							ID:     ordSellId.(uint64),
 							Filled: order.Qty,
@@ -146,8 +143,6 @@ func (ob *OrderBook) AddOrder(order types.Order) {
 							Remain: 0,
 						},
 					}
-					ob.pipe <- msgs
-					return
 				}
 			}
 		}
@@ -158,12 +153,14 @@ func (ob *OrderBook) AddOrder(order types.Order) {
 		} else {
 			ob.Sell[order.Price] = treemap.NewWith(utils.UInt64Comparator)
 			ob.Sell[order.Price].Put(order.ID, order.Qty)
+			mutils.InsertAsc(ob.SP, order.Price)
 
 			if ob.BP.Len() == 0 {
-				return
+				return nil
 			}
 			pBuyMax := ob.BP.Back()
 			for order.Price <= pBuyMax {
+
 				treeSell := ob.Sell[order.Price]
 				ordSellId, _ := treeSell.Min()
 				treeBuy := ob.Buy[pBuyMax]
@@ -179,7 +176,7 @@ func (ob *OrderBook) AddOrder(order types.Order) {
 						mutils.RemoveAsc(ob.BP, pBuyMax)
 					}
 
-					msgs := []types.PipeMsg{
+					msgs = append(msgs, []types.PipeMsg{
 						{
 							ID:     ordBuyId.(uint64),
 							Filled: qtyBuyF,
@@ -190,9 +187,7 @@ func (ob *OrderBook) AddOrder(order types.Order) {
 							Filled: qtyBuyF,
 							Remain: order.Qty,
 						},
-					}
-					ob.pipe <- msgs
-
+					}...)
 					pBuyMax = ob.BP.Back()
 					continue
 				}
@@ -210,7 +205,7 @@ func (ob *OrderBook) AddOrder(order types.Order) {
 						mutils.RemoveAsc(ob.SP, order.Price)
 					}
 
-					msgs := []types.PipeMsg{
+					return []types.PipeMsg{
 						{
 							ID:     ordBuyId.(uint64),
 							Filled: qtyBuyF,
@@ -222,7 +217,6 @@ func (ob *OrderBook) AddOrder(order types.Order) {
 							Remain: 0,
 						},
 					}
-					ob.pipe <- msgs
 				} else {
 					treeBuy.Put(ordBuyId, qtyBuyF-order.Qty)
 
@@ -232,7 +226,7 @@ func (ob *OrderBook) AddOrder(order types.Order) {
 						mutils.RemoveAsc(ob.SP, order.Price)
 					}
 
-					msgs := []types.PipeMsg{
+					return []types.PipeMsg{
 						{
 							ID:     ordBuyId.(uint64),
 							Filled: order.Qty,
@@ -244,12 +238,11 @@ func (ob *OrderBook) AddOrder(order types.Order) {
 							Remain: 0,
 						},
 					}
-					ob.pipe <- msgs
 				}
-				return
 			}
 		}
 	}
+	return msgs
 }
 
 func (ob *OrderBook) RemoveOrder(order types.Order) {
