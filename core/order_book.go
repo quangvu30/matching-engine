@@ -52,7 +52,6 @@ func (ob *OrderBook) AddOrder(order types.Order) []types.PipeMsg {
 			}
 			pSellMin := ob.SP.Front()
 			for order.Price >= pSellMin {
-
 				treeBuy := ob.Buy[order.Price]
 				ordBuyId, _ := treeBuy.Min()
 				// lay ra tree cua gia ban nho nhat
@@ -74,19 +73,25 @@ func (ob *OrderBook) AddOrder(order types.Order) []types.PipeMsg {
 					}
 
 					// tao message
-					msgs = append(msgs, types.PipeMsg{
-						ID:     ordSellId.(uint64),
-						Filled: qtySellF,
-						Remain: 0,
-					},
-					)
-					msgs = append(msgs, types.PipeMsg{
-						ID:     order.ID,
-						Filled: qtySellF,
-						Remain: order.Qty,
-					})
+					msgs = append(msgs, []types.PipeMsg{
+						{
+							ID:     ordSellId.(uint64),
+							PMatch: order.Price,
+							Filled: qtySellF,
+							Remain: 0,
+						},
+						{
+							ID:     order.ID,
+							PMatch: pSellMin,
+							Filled: qtySellF,
+							Remain: order.Qty,
+						},
+					}...)
 
 					// set lai pSellMin
+					if ob.SP.Len() == 0 {
+						break
+					}
 					pSellMin = ob.SP.Front()
 					continue
 				}
@@ -110,11 +115,13 @@ func (ob *OrderBook) AddOrder(order types.Order) []types.PipeMsg {
 					return []types.PipeMsg{
 						{
 							ID:     ordSellId.(uint64),
+							PMatch: order.Price,
 							Filled: qtySellF,
 							Remain: 0,
 						},
 						{
 							ID:     order.ID,
+							PMatch: pSellMin,
 							Filled: qtySellF,
 							Remain: 0,
 						},
@@ -134,11 +141,13 @@ func (ob *OrderBook) AddOrder(order types.Order) []types.PipeMsg {
 					return []types.PipeMsg{
 						{
 							ID:     ordSellId.(uint64),
+							PMatch: order.Price,
 							Filled: order.Qty,
 							Remain: qtySellF - order.Qty,
 						},
 						{
 							ID:     order.ID,
+							PMatch: pSellMin,
 							Filled: order.Qty,
 							Remain: 0,
 						},
@@ -160,7 +169,6 @@ func (ob *OrderBook) AddOrder(order types.Order) []types.PipeMsg {
 			}
 			pBuyMax := ob.BP.Back()
 			for order.Price <= pBuyMax {
-
 				treeSell := ob.Sell[order.Price]
 				ordSellId, _ := treeSell.Min()
 				treeBuy := ob.Buy[pBuyMax]
@@ -179,15 +187,21 @@ func (ob *OrderBook) AddOrder(order types.Order) []types.PipeMsg {
 					msgs = append(msgs, []types.PipeMsg{
 						{
 							ID:     ordBuyId.(uint64),
+							PMatch: order.Price,
 							Filled: qtyBuyF,
 							Remain: 0,
 						},
 						{
 							ID:     order.ID,
+							PMatch: pBuyMax,
 							Filled: qtyBuyF,
 							Remain: order.Qty,
 						},
 					}...)
+
+					if ob.BP.Len() == 0 {
+						break
+					}
 					pBuyMax = ob.BP.Back()
 					continue
 				}
@@ -208,11 +222,13 @@ func (ob *OrderBook) AddOrder(order types.Order) []types.PipeMsg {
 					return []types.PipeMsg{
 						{
 							ID:     ordBuyId.(uint64),
+							PMatch: order.Price,
 							Filled: qtyBuyF,
 							Remain: 0,
 						},
 						{
 							ID:     order.ID,
+							PMatch: pBuyMax,
 							Filled: qtyBuyF,
 							Remain: 0,
 						},
@@ -229,11 +245,13 @@ func (ob *OrderBook) AddOrder(order types.Order) []types.PipeMsg {
 					return []types.PipeMsg{
 						{
 							ID:     ordBuyId.(uint64),
+							PMatch: order.Price,
 							Filled: order.Qty,
 							Remain: qtyBuyF - order.Qty,
 						},
 						{
 							ID:     order.ID,
+							PMatch: pBuyMax,
 							Filled: order.Qty,
 							Remain: 0,
 						},
@@ -261,6 +279,36 @@ func (ob *OrderBook) RemoveOrder(order types.Order) {
 			mutils.RemoveAsc(ob.SP, order.Price)
 		}
 	}
+}
+
+func (ob *OrderBook) GetAskDepth(size int) [][]float64 {
+	depth := [][]float64{}
+	for i := 0; i < ob.SP.Len(); i++ {
+		p := ob.SP.At(i)
+		tree := ob.Sell[p]
+		for _, v := range tree.Values() {
+			depth = append(depth, []float64{p, v.(float64)})
+			if len(depth) == size {
+				return depth
+			}
+		}
+	}
+	return depth
+}
+
+func (ob *OrderBook) GetBidDepth(size int) [][]float64 {
+	depth := [][]float64{}
+	for i := ob.BP.Len() - 1; i >= 0; i-- {
+		p := ob.BP.At(i)
+		tree := ob.Buy[p]
+		for _, v := range tree.Values() {
+			depth = append(depth, []float64{p, v.(float64)})
+			if len(depth) == size {
+				return depth
+			}
+		}
+	}
+	return depth
 }
 
 func (ob *OrderBook) GetOrderBook() {
