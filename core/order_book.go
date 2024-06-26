@@ -32,8 +32,8 @@ func NewOrderBook() *OrderBook {
 	}
 }
 
-func (ob *OrderBook) AddOrder(order types.Order) []types.PipeMsg {
-	msgs := []types.PipeMsg{}
+func (ob *OrderBook) AddOrder(order types.Order) []types.ResultMatching {
+	msgs := []types.ResultMatching{}
 	if order.Side == B {
 		// kiem tra gia mua da ton tai chua
 		tree, exist := ob.Buy[order.Price]
@@ -73,10 +73,10 @@ func (ob *OrderBook) AddOrder(order types.Order) []types.PipeMsg {
 					}
 
 					// tao message
-					msgs = append(msgs, []types.PipeMsg{
+					msgs = append(msgs, []types.ResultMatching{
 						{
 							ID:     ordSellId.(uint64),
-							PMatch: order.Price,
+							PMatch: pSellMin,
 							Filled: qtySellF,
 							Remain: 0,
 						},
@@ -112,10 +112,10 @@ func (ob *OrderBook) AddOrder(order types.Order) []types.PipeMsg {
 					}
 
 					// tao message
-					return []types.PipeMsg{
+					return []types.ResultMatching{
 						{
 							ID:     ordSellId.(uint64),
-							PMatch: order.Price,
+							PMatch: pSellMin,
 							Filled: qtySellF,
 							Remain: 0,
 						},
@@ -138,10 +138,10 @@ func (ob *OrderBook) AddOrder(order types.Order) []types.PipeMsg {
 					}
 
 					// tao message
-					return []types.PipeMsg{
+					return []types.ResultMatching{
 						{
 							ID:     ordSellId.(uint64),
-							PMatch: order.Price,
+							PMatch: pSellMin,
 							Filled: order.Qty,
 							Remain: qtySellF - order.Qty,
 						},
@@ -184,10 +184,10 @@ func (ob *OrderBook) AddOrder(order types.Order) []types.PipeMsg {
 						mutils.RemoveAsc(ob.BP, pBuyMax)
 					}
 
-					msgs = append(msgs, []types.PipeMsg{
+					msgs = append(msgs, []types.ResultMatching{
 						{
 							ID:     ordBuyId.(uint64),
-							PMatch: order.Price,
+							PMatch: pBuyMax,
 							Filled: qtyBuyF,
 							Remain: 0,
 						},
@@ -219,10 +219,10 @@ func (ob *OrderBook) AddOrder(order types.Order) []types.PipeMsg {
 						mutils.RemoveAsc(ob.SP, order.Price)
 					}
 
-					return []types.PipeMsg{
+					return []types.ResultMatching{
 						{
 							ID:     ordBuyId.(uint64),
-							PMatch: order.Price,
+							PMatch: pBuyMax,
 							Filled: qtyBuyF,
 							Remain: 0,
 						},
@@ -242,10 +242,10 @@ func (ob *OrderBook) AddOrder(order types.Order) []types.PipeMsg {
 						mutils.RemoveAsc(ob.SP, order.Price)
 					}
 
-					return []types.PipeMsg{
+					return []types.ResultMatching{
 						{
 							ID:     ordBuyId.(uint64),
-							PMatch: order.Price,
+							PMatch: pBuyMax,
 							Filled: order.Qty,
 							Remain: qtyBuyF - order.Qty,
 						},

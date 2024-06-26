@@ -7,3 +7,10 @@ type Order struct {
 	Side  int8
 	Type  int8
 }
+
+type ResultMatching struct {
+	ID     uint64
+	PMatch float64
+	Filled float64
+	Remain float64
+}
