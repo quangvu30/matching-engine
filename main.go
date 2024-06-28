@@ -17,7 +17,7 @@ func main() {
 	start := time.Now()
 	for i := 0; i < 100; i++ {
 		order := randomOrder(i)
-		appl.AddOrder(order)
+		appl.AddLimitOrder(order)
 	}
 	elapsed := time.Since(start)
 	fmt.Printf("Execution time: %s\n", elapsed)
@@ -54,7 +54,6 @@ func randomOrder(i int) types.Order {
 			Price: float64(price),
 			Qty:   float64(qty),
 			Side:  0,
-			Type:  0,
 		}
 	} else {
 		return types.Order{
@@ -62,7 +61,6 @@ func randomOrder(i int) types.Order {
 			Price: float64(price),
 			Qty:   float64(qty),
 			Side:  1,
-			Type:  0,
 		}
 	}
 }

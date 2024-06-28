@@ -32,7 +32,122 @@ func NewOrderBook() *OrderBook {
 	}
 }
 
-func (ob *OrderBook) AddOrder(order types.Order) []types.ResultMatching {
+/*
+* Make sure liquidity is available before adding a market order
+ */
+func (ob *OrderBook) AddMarketOrder(order types.Order) []types.ResultMatching {
+	msgs := []types.ResultMatching{}
+	if order.Side == B {
+		if ob.SP.Len() == 0 {
+			return nil
+		}
+		pSellMin := ob.SP.Front()
+		for order.Qty > 0 {
+			treeSell := ob.Sell[pSellMin]
+			ordSellId, qtySell := treeSell.Min()
+			qtySellF := qtySell.(float64)
+			if order.Qty > qtySellF {
+				order.Qty -= qtySellF
+				treeSell.Remove(ordSellId)
+				if treeSell.Empty() {
+					delete(ob.Sell, pSellMin)
+					mutils.RemoveAsc(ob.SP, pSellMin)
+				}
+				msgs = append(msgs, []types.ResultMatching{
+					{
+						ID:     ordSellId.(uint64),
+						PMatch: pSellMin,
+						Filled: qtySellF,
+						Remain: 0,
+					},
+					{
+						ID:     order.ID,
+						PMatch: pSellMin,
+						Filled: qtySellF,
+						Remain: order.Qty,
+					},
+				}...)
+				if ob.SP.Len() == 0 {
+					break
+				}
+				pSellMin = ob.SP.Front()
+			} else {
+				treeSell.Put(ordSellId, qtySellF-order.Qty)
+				msgs = append(msgs, []types.ResultMatching{
+					{
+						ID:     ordSellId.(uint64),
+						PMatch: pSellMin,
+						Filled: order.Qty,
+						Remain: qtySellF - order.Qty,
+					},
+					{
+						ID:     order.ID,
+						PMatch: pSellMin,
+						Filled: order.Qty,
+						Remain: 0,
+					},
+				}...)
+				break
+			}
+		}
+	} else {
+		if ob.BP.Len() == 0 {
+			return nil
+		}
+		pBuyMax := ob.BP.Back()
+		for order.Qty > 0 {
+			treeBuy := ob.Buy[pBuyMax]
+			ordBuyId, qtyBuy := treeBuy.Min()
+			qtyBuyF := qtyBuy.(float64)
+			if order.Qty > qtyBuyF {
+				order.Qty -= qtyBuyF
+				treeBuy.Remove(ordBuyId)
+				if treeBuy.Empty() {
+					delete(ob.Buy, pBuyMax)
+					mutils.RemoveAsc(ob.BP, pBuyMax)
+				}
+				msgs = append(msgs, []types.ResultMatching{
+					{
+						ID:     ordBuyId.(uint64),
+						PMatch: pBuyMax,
+						Filled: qtyBuyF,
+						Remain: 0,
+					},
+					{
+						ID:     order.ID,
+						PMatch: pBuyMax,
+						Filled: qtyBuyF,
+						Remain: order.Qty,
+					},
+				}...)
+				if ob.BP.Len() == 0 {
+					break
+				}
+				pBuyMax = ob.BP.Back()
+			} else {
+				treeBuy.Put(ordBuyId, qtyBuyF-order.Qty)
+				msgs = append(msgs, []types.ResultMatching{
+					{
+						ID:     ordBuyId.(uint64),
+						PMatch: pBuyMax,
+						Filled: order.Qty,
+						Remain: qtyBuyF - order.Qty,
+					},
+					{
+						ID:     order.ID,
+						PMatch: pBuyMax,
+						Filled: order.Qty,
+						Remain: 0,
+					},
+				}...)
+				break
+			}
+		}
+	}
+	return msgs
+}
+
+func (ob *OrderBook) AddLimitOrder(order types.Order) []types.ResultMatching {
 	msgs := []types.ResultMatching{}
 	if order.Side == B {
 		// kiem tra gia mua da ton tai chua

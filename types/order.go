@@ -5,7 +5,6 @@ type Order struct {
 	Price float64
 	Qty   float64
 	Side  int8
-	Type  int8
 }
 
 type ResultMatching struct {

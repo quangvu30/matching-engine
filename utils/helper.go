@@ -21,7 +21,6 @@ func RandomOrder(i int) types.Order {
 			Price: float64(price),
 			Qty:   float64(qty),
 			Side:  0,
-			Type:  0,
 		}
 	} else {
 		return types.Order{
@@ -29,7 +28,6 @@ func RandomOrder(i int) types.Order {
 			Price: float64(price),
 			Qty:   float64(qty),
 			Side:  1,
-			Type:  0,
 		}
 	}
 }
